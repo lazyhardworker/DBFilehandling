@@ -1,0 +1,17 @@
+Database Performance Report
+===========================
+Database file: database.db
+File size: 20480 bytes
+Total records inserted: 100
+Records after delete/compact: 90
+
+Operation timings (milliseconds):
+- Create database: 4.678 ms
+- Insert 100 records: 277.439 ms
+- Read 100 records: 2.362 ms
+- Update 100 records: 292.093 ms
+- Delete 10 records: 30.841 ms
+- Compact database: 3.131 ms
+- List records: 0.169 ms
+
+Note: actual timings depend on disk, OS, and hardware.
