@@ -2,6 +2,8 @@
 #include <cstdio>
 #include <iostream>
 
+using namespace std;
+
 namespace db {
 
 static int sqliteCallback(void*, int, char**, char**) {
@@ -16,17 +18,17 @@ DatabaseFile::~DatabaseFile() {
     close();
 }
 
-bool DatabaseFile::create(const std::string& path) {
-    std::remove(path.c_str());
+bool DatabaseFile::create(const string& path) {
+    remove(path.c_str());
     return open(path);
 }
 
-bool DatabaseFile::open(const std::string& path) {
+bool DatabaseFile::open(const string& path) {
     close();
     path_ = path;
     int result = sqlite3_open_v2(path_.c_str(), &db_, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, nullptr);
     if (result != SQLITE_OK) {
-        std::cerr << "SQLite open failed: " << sqlite3_errmsg(db_) << "\n";
+        cerr << "SQLite open failed: " << sqlite3_errmsg(db_) << "\n";
         close();
         return false;
     }
@@ -45,11 +47,11 @@ bool DatabaseFile::isOpen() const {
     return db_ != nullptr;
 }
 
-uint64_t DatabaseFile::insertRecord(const std::string& name, const std::string& email) {
+uint64_t DatabaseFile::insertRecord(const string& name, const string& email) {
     if (!isOpen()) {
         return 0;
     }
-    const std::string sql = "INSERT INTO employees (name, email, deleted) VALUES (?, ?, 0);";
+    const string sql = "INSERT INTO employees (name, email, deleted) VALUES (?, ?, 0);";
     sqlite3_stmt* stmt = nullptr;
     if (!prepareStatement(sql, &stmt)) {
         return 0;
@@ -64,17 +66,17 @@ uint64_t DatabaseFile::insertRecord(const std::string& name, const std::string& 
     return static_cast<uint64_t>(sqlite3_last_insert_rowid(db_));
 }
 
-std::optional<Record> DatabaseFile::readRecord(uint64_t id) const {
+optional<Record> DatabaseFile::readRecord(uint64_t id) const {
     if (!isOpen()) {
-        return std::nullopt;
+        return nullopt;
     }
-    const std::string sql = "SELECT id, deleted, name, email FROM employees WHERE id = ?;";
+    const string sql = "SELECT id, deleted, name, email FROM employees WHERE id = ?;";
     sqlite3_stmt* stmt = nullptr;
     if (!prepareStatement(sql, &stmt)) {
-        return std::nullopt;
+        return nullopt;
     }
     sqlite3_bind_int64(stmt, 1, static_cast<sqlite3_int64>(id));
-    std::optional<Record> record;
+    optional<Record> record;
     if (sqlite3_step(stmt) == SQLITE_ROW) {
         record = Record{
             static_cast<uint64_t>(sqlite3_column_int64(stmt, 0)),
@@ -86,11 +88,11 @@ std::optional<Record> DatabaseFile::readRecord(uint64_t id) const {
     return record;
 }
 
-bool DatabaseFile::updateRecord(uint64_t id, const std::string& name, const std::string& email) {
+bool DatabaseFile::updateRecord(uint64_t id, const string& name, const string& email) {
     if (!isOpen()) {
         return false;
     }
-    const std::string sql = "UPDATE employees SET name = ?, email = ? WHERE id = ? AND deleted = 0;";
+    const string sql = "UPDATE employees SET name = ?, email = ? WHERE id = ? AND deleted = 0;";
     sqlite3_stmt* stmt = nullptr;
     if (!prepareStatement(sql, &stmt)) {
         return false;
@@ -107,7 +109,7 @@ bool DatabaseFile::deleteRecord(uint64_t id) {
     if (!isOpen()) {
         return false;
     }
-    const std::string sql = "UPDATE employees SET deleted = 1 WHERE id = ? AND deleted = 0;";
+    const string sql = "UPDATE employees SET deleted = 1 WHERE id = ? AND deleted = 0;";
     sqlite3_stmt* stmt = nullptr;
     if (!prepareStatement(sql, &stmt)) {
         return false;
@@ -118,12 +120,12 @@ bool DatabaseFile::deleteRecord(uint64_t id) {
     return result == SQLITE_DONE && sqlite3_changes(db_) > 0;
 }
 
-std::vector<Record> DatabaseFile::listRecords(bool includeDeleted) const {
-    std::vector<Record> records;
+vector<Record> DatabaseFile::listRecords(bool includeDeleted) const {
+    vector<Record> records;
     if (!isOpen()) {
         return records;
     }
-    const std::string sql = includeDeleted
+    const string sql = includeDeleted
         ? "SELECT id, deleted, name, email FROM employees ORDER BY id;"
         : "SELECT id, deleted, name, email FROM employees WHERE deleted = 0 ORDER BY id;";
     sqlite3_stmt* stmt = nullptr;
@@ -148,34 +150,34 @@ bool DatabaseFile::compact() {
     return execute("VACUUM;");
 }
 
-bool DatabaseFile::execute(const std::string& sql) const {
+bool DatabaseFile::execute(const string& sql) const {
     if (!isOpen()) {
         return false;
     }
     char* errMsg = nullptr;
     int result = sqlite3_exec(db_, sql.c_str(), sqliteCallback, nullptr, &errMsg);
     if (result != SQLITE_OK) {
-        std::cerr << "SQLite execute failed: " << (errMsg ? errMsg : "unknown error") << "\n";
+        cerr << "SQLite execute failed: " << (errMsg ? errMsg : "unknown error") << "\n";
         sqlite3_free(errMsg);
         return false;
     }
     return true;
 }
 
-bool DatabaseFile::prepareStatement(const std::string& sql, sqlite3_stmt** stmt) const {
+bool DatabaseFile::prepareStatement(const string& sql, sqlite3_stmt** stmt) const {
     if (!isOpen()) {
         return false;
     }
     int result = sqlite3_prepare_v2(db_, sql.c_str(), static_cast<int>(sql.size()), stmt, nullptr);
     if (result != SQLITE_OK) {
-        std::cerr << "SQLite prepare failed: " << sqlite3_errmsg(db_) << "\n";
+        cerr << "SQLite prepare failed: " << sqlite3_errmsg(db_) << "\n";
         return false;
     }
     return true;
 }
 
 bool DatabaseFile::initializeSchema() {
-    const std::string sql =
+    const string sql =
         "CREATE TABLE IF NOT EXISTS employees ("
         "id INTEGER PRIMARY KEY AUTOINCREMENT,"
         "name TEXT NOT NULL,"
@@ -185,8 +187,8 @@ bool DatabaseFile::initializeSchema() {
     return execute(sql);
 }
 
-std::string formatRecord(const Record& record) {
-    return "Record { id=" + std::to_string(record.id)
+string formatRecord(const Record& record) {
+    return "Record { id=" + to_string(record.id)
         + ", deleted=" + (record.deleted ? "true" : "false")
         + ", name='" + record.name + "', email='" + record.email + "' }";
 }
