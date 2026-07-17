@@ -1,17 +1,233 @@
-Database Performance Report
-===========================
-Database file: database.db
-File size: 20480 bytes
-Total records inserted: 100
-Records after delete/compact: 90
 
-Operation timings (milliseconds):
-- Create database: 4.678 ms
-- Insert 100 records: 277.439 ms
-- Read 100 records: 2.362 ms
-- Update 100 records: 292.093 ms
-- Delete 10 records: 30.841 ms
-- Compact database: 3.131 ms
-- List records: 0.169 ms
+================================================================================
+        DATABASE INDEXING ALGORITHM  —  PERFORMANCE BENCHMARK REPORT
+        Linear Scan  vs  Hash Index (unordered_map)  vs  B-Tree Index
+================================================================================
 
-Note: actual timings depend on disk, OS, and hardware.
+ALGORITHMS
+----------
+  Linear Scan   No SQLite index on 'name'.  Every name-based lookup
+                performs a full sequential table scan.  Complexity: O(n).
+
+  Hash Index    No SQLite index.  An in-memory std::unordered_map<name,rowid>
+                is maintained by the application.  Lookup is O(1) average;
+                inserts and deletes also update the map.
+
+  B-Tree Index  Native SQLite CREATE INDEX on the 'name' column.
+                SQLite automatically uses the B-Tree for WHERE name=? queries.
+                Complexity: O(log n) lookup, O(log n) insert overhead.
+
+METHODOLOGY
+-----------
+  * Each algorithm operates on its own isolated table.
+  * Database opened with WAL journal mode, NORMAL sync, 16 MB page cache.
+  * Inserts wrapped in explicit BEGIN/COMMIT transactions.
+  * Updates and deletes also transacted to isolate their cost.
+  * Lookup  : 100 point-lookups by name (random, seed=42).
+  * Range Query : name BETWEEN low AND high (matches 100 records).
+  * Prefix Search : name GLOB 'Employee_0001*' (matches ~1000 records at large scales).
+  * Ordered Scan : SELECT all non-deleted records ORDER BY name.
+  * Update  : 100 records updated by primary-key id.
+  * Delete  : 50 unique soft-deletes (deleted=1).
+  * Range Scan: SELECT all non-deleted records in id order.
+  * Compact : VACUUM the entire database.
+  * (*) marks the fastest algorithm for each operation.
+
+================================================================================
+ DATASET SIZE: 1000 RECORDS
+================================================================================
+
+ Operation                        Linear Scan        Hash Index      B-Tree Index
+ -------------------------------------------------------------------------------
+ Insert 1000 records             1.671 ms (*)      1.847 ms          1.984 ms    
+ Lookup (100 by name)            1.250 ms          0.360 ms (*)      0.464 ms    
+ Range Query (100 records)       0.078 ms          0.073 ms          0.035 ms (*)
+ Prefix Search (GLOB)            0.048 ms          0.043 ms          0.019 ms (*)
+ Ordered Scan (ORDER BY)         0.282 ms          0.314 ms          0.217 ms (*)
+ Update (100 records)            0.248 ms (*)      0.333 ms          0.431 ms    
+ Delete (50 soft)                0.150 ms          0.145 ms          0.138 ms (*)
+ Range Scan (list all)           0.195 ms          0.188 ms          0.186 ms (*)
+ Compact (VACUUM)                0.383 ms (*)      0.585 ms          0.854 ms    
+ -------------------------------------------------------------------------------
+
+ Throughput:
+   Insert (rec/s)  :       598408 (Linear) |       541331 (Hash)   |       503931 (B-Tree)
+   Lookup (op/s)   :        80026 (Linear) |       277624 (Hash)   |       215471 (B-Tree)
+
+ DB file size after compact: 24.0 KB
+
+ Winner per operation:
+   Insert       : Linear Scan
+   Lookup       : Hash Index
+   Range Query  : B-Tree Index
+   Prefix Search: B-Tree Index
+   Ordered Scan : B-Tree Index
+   Update       : Linear Scan
+   Delete       : B-Tree Index
+   Range Scan   : B-Tree Index
+   Compact      : Linear Scan
+
+================================================================================
+ DATASET SIZE: 10000 RECORDS
+================================================================================
+
+ Operation                        Linear Scan        Hash Index      B-Tree Index
+ -------------------------------------------------------------------------------
+ Insert 10000 records           15.783 ms (*)     17.849 ms         17.366 ms    
+ Lookup (100 by name)            8.792 ms          0.367 ms (*)      0.448 ms    
+ Range Query (100 records)       0.304 ms          0.289 ms          0.027 ms (*)
+ Prefix Search (GLOB)            0.568 ms          0.492 ms          0.211 ms (*)
+ Ordered Scan (ORDER BY)         2.980 ms          2.827 ms          1.992 ms (*)
+ Update (100 records)            0.762 ms          0.622 ms (*)      0.960 ms    
+ Delete (50 soft)                0.411 ms          0.318 ms          0.302 ms (*)
+ Range Scan (list all)           2.131 ms          1.595 ms (*)      1.699 ms    
+ Compact (VACUUM)                1.973 ms (*)      2.850 ms          4.664 ms    
+ -------------------------------------------------------------------------------
+
+ Throughput:
+   Insert (rec/s)  :       633577 (Linear) |       560268 (Hash)   |       575851 (B-Tree)
+   Lookup (op/s)   :        11373 (Linear) |       272480 (Hash)   |       223264 (B-Tree)
+
+ DB file size after compact: 192.0 KB
+
+ Winner per operation:
+   Insert       : Linear Scan
+   Lookup       : Hash Index
+   Range Query  : B-Tree Index
+   Prefix Search: B-Tree Index
+   Ordered Scan : B-Tree Index
+   Update       : Hash Index
+   Delete       : B-Tree Index
+   Range Scan   : Hash Index
+   Compact      : Linear Scan
+
+================================================================================
+ DATASET SIZE: 100000 RECORDS
+================================================================================
+
+ Operation                        Linear Scan        Hash Index      B-Tree Index
+ -------------------------------------------------------------------------------
+ Insert 100000 records         155.349 ms (*)    190.435 ms        195.608 ms    
+ Lookup (100 by name)           79.998 ms          0.525 ms (*)      0.661 ms    
+ Range Query (100 records)       2.567 ms          2.936 ms          0.036 ms (*)
+ Prefix Search (GLOB)            2.736 ms          2.737 ms          0.228 ms (*)
+ Ordered Scan (ORDER BY)        27.580 ms         28.279 ms         20.298 ms (*)
+ Update (100 records)            2.525 ms (*)      2.848 ms          3.016 ms    
+ Delete (50 soft)                0.348 ms          0.462 ms          0.344 ms (*)
+ Range Scan (list all)          17.901 ms         17.832 ms (*)     18.687 ms    
+ Compact (VACUUM)               26.965 ms (*)     53.476 ms        109.632 ms    
+ -------------------------------------------------------------------------------
+
+ Throughput:
+   Insert (rec/s)  :       643711 (Linear) |       525114 (Hash)   |       511226 (B-Tree)
+   Lookup (op/s)   :         1250 (Linear) |       190367 (Hash)   |       151309 (B-Tree)
+
+ DB file size after compact: 6032.0 KB
+
+ Winner per operation:
+   Insert       : Linear Scan
+   Lookup       : Hash Index
+   Range Query  : B-Tree Index
+   Prefix Search: B-Tree Index
+   Ordered Scan : B-Tree Index
+   Update       : Linear Scan
+   Delete       : B-Tree Index
+   Range Scan   : Hash Index
+   Compact      : Linear Scan
+
+================================================================================
+ DATASET SIZE: 1000000 RECORDS
+================================================================================
+
+ Operation                        Linear Scan        Hash Index      B-Tree Index
+ -------------------------------------------------------------------------------
+ Insert 1000000 records       1605.672 ms (*)   2299.429 ms       2049.192 ms    
+ Lookup (100 by name)         1848.409 ms          1.072 ms (*)      1.465 ms    
+ Range Query (100 records)      46.265 ms         53.875 ms          0.052 ms (*)
+ Prefix Search (GLOB)           51.813 ms         49.691 ms          0.291 ms (*)
+ Ordered Scan (ORDER BY)       437.161 ms        472.832 ms        260.045 ms (*)
+ Update (100 records)            3.601 ms          3.194 ms (*)      3.502 ms    
+ Delete (50 soft)                0.822 ms          0.654 ms          0.523 ms (*)
+ Range Scan (list all)         220.176 ms        219.514 ms (*)    255.320 ms    
+ Compact (VACUUM)              384.119 ms (*)    652.114 ms       1121.903 ms    
+ -------------------------------------------------------------------------------
+
+ Throughput:
+   Insert (rec/s)  :       622792 (Linear) |       434891 (Hash)   |       487997 (B-Tree)
+   Lookup (op/s)   :           54 (Linear) |        93266 (Hash)   |        68278 (B-Tree)
+
+ DB file size after compact: 60436.0 KB
+
+ Winner per operation:
+   Insert       : Linear Scan
+   Lookup       : Hash Index
+   Range Query  : B-Tree Index
+   Prefix Search: B-Tree Index
+   Ordered Scan : B-Tree Index
+   Update       : Hash Index
+   Delete       : B-Tree Index
+   Range Scan   : Hash Index
+   Compact      : Linear Scan
+
+================================================================================
+ SCALING ANALYSIS  (lookup latency across dataset sizes)
+================================================================================
+
+ Algorithm                1000 rows        10000 rows       100000 rows      1000000 rows
+ ----------------------------------------------------------------------------------------
+ Linear Scan               1.250 ms          8.792 ms         79.998 ms       1848.409 ms
+ Hash Index                0.360 ms          0.367 ms          0.525 ms          1.072 ms
+ B-Tree Index              0.464 ms          0.448 ms          0.661 ms          1.465 ms
+
+ Linear Scan latency grows proportionally with table size (O(n)).
+ Hash Index lookup stays near-constant regardless of size  (O(1) avg).
+ B-Tree Index grows logarithmically — barely visible at these scales.
+
+================================================================================
+ ANALYSIS & RECOMMENDATIONS
+================================================================================
+
+ 1. INSERT PERFORMANCE
+    All strategies issue inserts into SQLite pages inside transactions.
+    B-Tree index adds overhead per insert to maintain the sorted index tree.
+    Hash strategy maintains the in-memory map (negligible cost vs. disk I/O).
+    Expected: Linear (fastest) ~= Hash < B-Tree (index maintenance overhead).
+
+ 2. POINT LOOKUP BY NAME
+    Hash achieves O(1) average via unordered_map, then O(1) by primary key.
+    B-Tree achieves O(log n) via the SQLite native index.
+    Linear performs O(n) full table scan — degrades severely with data size.
+    Expected: Hash < B-Tree << Linear (gap widens as n increases).
+
+ 3. UPDATE PERFORMANCE
+    Updates target a known primary key (O(1) SQLite row access).
+    B-Tree must update its index entry for the changed 'name' field.
+    Hash must update the in-memory map keys on name change.
+    Expected: similar for all three; minor overhead in Hash and B-Tree.
+
+ 4. B-TREE ADVANTAGE (Range, Prefix, Ordering)
+    Range Query: B-Tree uses index to jump to start and scan exactly k rows (O(log n + k)).
+    Prefix Search: B-Tree uses index for GLOB matches (O(log n + k)).
+    Ordered Scan: B-Tree avoids O(n log n) filesort by traversing index.
+    Linear & Hash: Force a full table scan O(n) for all three, plus filesort for ordering.
+    Expected: B-Tree Dominates << Hash ~= Linear.
+
+ 5. RANGE SCAN (No Order)
+    All strategies read the full active record set sequentially — O(n).
+    No meaningful difference expected between strategies.
+
+ 6. SCALABILITY SUMMARY
+    As n grows from 1K to 50K, Linear lookup degrades ~50x.
+    Hash lookup stays nearly constant (in-memory O(1)).
+    B-Tree lookup grows logarithmically (~log2(50000/1000) = ~5.6x slower).
+
+ RECOMMENDATIONS
+    - Read-heavy workloads, large datasets : Use B-Tree indexes (balanced).
+    - Lookup-dominant, memory available    : Use Hash index for max speed.
+    - Range queries, sorting by column     : Use B-Tree indexes (essential).
+    - Write-heavy, no point lookups needed : Linear (no index overhead).
+    - Never leave large tables un-indexed  : Linear degrades rapidly.
+
+ NOTE: Timings depend on disk speed, OS, CPU cache, and SQLite page cache.
+ For production analysis, run multiple passes and average the results.
+ (*) marks the fastest algorithm in each row.

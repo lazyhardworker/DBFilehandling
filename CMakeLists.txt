@@ -10,5 +10,12 @@ if(NOT SQLITE3_INCLUDE_DIR OR NOT SQLITE3_LIBRARY)
 endif()
 
 include_directories(${SQLITE3_INCLUDE_DIR})
-add_executable(dbfilehandling src/main.cpp src/DatabaseFile.cpp)
+
+add_executable(dbfilehandling
+    src/main.cpp
+    src/DatabaseFile.cpp
+    src/IndexManager.cpp
+    src/PerformanceBenchmark.cpp
+)
+
 target_link_libraries(dbfilehandling PRIVATE ${SQLITE3_LIBRARY})
