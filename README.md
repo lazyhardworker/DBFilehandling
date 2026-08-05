@@ -1,4 +1,4 @@
-# DBFilehandling
+# CDB1(Custom Database Binary format v1)
 
 A C++17 project that benchmarks **three database indexing strategies** — Linear Scan, Hash Index, and B-Tree Index — against a real SQLite database, then generates a detailed performance analysis report.
 
